@@ -30,34 +30,19 @@ jobs:
                 exit 1
               fi
 
-    analyse-code:
-        name: "Analyse Code"
+    analyse-test:
+        name: "Analyse & Test"
         runs-on: ubuntu-latest
         steps:
           - name: Checkout Repository
             uses: actions/checkout@v3
-          - name: Setup Flutter Environment
-            uses: subosito/flutter-action@v2
-            with:
-              channel: "stable"
-          - name: Get Package & Example Dependencies
-            run: flutter pub get
-          - name: Get Test Tile Server Dependencies
-            run: dart pub get -C tile_server
+          - name: Setup Dart Environment
+            uses: dart-lang/setup-dart@v1.5.0
+          - name: Get (0!) Dependencies
+            run: dart pub get
           - name: Check Formatting
             run: dart format --output=none --set-exit-if-changed .
           - name: Check Lints
             run: dart analyze --fatal-infos --fatal-warnings
-    
-    run-tests:
-        name: "Run Tests"
-        runs-on: ubuntu-latest
-        steps:
-          - name: Checkout Repository
-            uses: actions/checkout@v3
-          - name: Setup Flutter Environment
-            uses: subosito/flutter-action@v2
-            with:
-              channel: "stable"
           - name: Run Tests
-            run: flutter test -r expanded
+            run: dart test -r expanded
