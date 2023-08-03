@@ -1,14 +1,10 @@
 name: dart_earcut
-description: A sample command-line application.
+description: Performant triangulation algorithm based on https://github.com/mapbox/earcut
 version: 1.0.0
-# repository: https://github.com/my_org/my_repo
+repository: https://github.com/JaffaKetchup/dart_earcut
 
 environment:
-  sdk: ^3.0.7
-
-# Add regular dependencies here.
-dependencies:
-  # path: ^1.8.0
+  sdk: ^3.0.0
 
 dev_dependencies:
   lints: ^2.0.0
