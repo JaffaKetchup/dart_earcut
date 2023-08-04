@@ -5,7 +5,7 @@ import 'dart:math';
 /// Earcutting triangulation algorithm, ported (with minor API differences) from
 /// [earcut4j/earcut4j](https://github.com/earcut4j/earcut4j) and
 /// [mapbox/earcut](https://github.com/mapbox/earcut).
-final class Earcut {
+abstract final class Earcut {
   /// Triangulates the given polygon
   ///
   /// [polygonVertices] should be a list of all the [Point]s defining
@@ -819,7 +819,7 @@ final class Earcut {
   }
 }
 
-class _Node {
+final class _Node {
   int i;
   double x;
   double y;
@@ -833,7 +833,4 @@ class _Node {
   _Node(this.i, this.x, this.y)
       : z = 4.9E-324,
         steiner = false;
-
-  @override
-  String toString() => 'i: $i, x: $x, y: $y, prev: $prev, next: $next';
 }
