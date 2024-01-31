@@ -46,8 +46,14 @@ abstract final class Earcut {
     final int outerLen =
         hasHoles ? holeIndices[0] * dimensions : polygonVertices.length;
 
-    _Node? outerNode =
-        _linkedList(polygonVertices, 0, outerLen, dimensions, clockwise: true);
+    _Node? outerNode = _linkedList(
+      polygonVertices,
+      0,
+      outerLen,
+      dimensions,
+      null,
+      clockwise: true,
+    );
 
     final triangles = <int>[];
 
@@ -546,11 +552,15 @@ abstract final class Earcut {
   ) {
     final queue = <_Node>[];
 
+    int holeId = 0;
+
     final int len = holeIndices.length;
     for (int i = 0; i < len; i++) {
       final int start = holeIndices[i] * dim;
       final int end = i < len - 1 ? holeIndices[i + 1] * dim : data.length;
-      final _Node? list = _linkedList(data, start, end, dim, clockwise: false);
+      holeId = i + 1;
+      final _Node? list =
+          _linkedList(data, start, end, dim, holeId, clockwise: false);
       if (list == list?.next) list?.steiner = true;
       queue.add(_getLeftmost(list!));
     }
@@ -582,8 +592,36 @@ abstract final class Earcut {
     do {
       again = false;
 
-      if (!p.steiner && _equals(p, p.next!) ||
-          _area(p.prev!, p, p.next!) == 0) {
+      final prevHole = p.prev!.holeId;
+      final currentHole = p.holeId;
+      final nextHole = p.next!.holeId;
+
+      var toRemove = false;
+
+      if (!p.steiner) {
+        if (_equals(p, p.next!) || _equals(p.prev!, p)) {
+          toRemove = true;
+        } else if ((prevHole != null || prevHole != 0) ||
+            (nextHole != null || nextHole != 0) ||
+            prevHole == nextHole ||
+            prevHole != currentHole) {
+          // When `p.prev, p & p.next` are collinear,
+          // If `p.prev, p & p.next` are on holes (not outer edge) ,
+          // And `p.prev & p` are on the same hole ,
+          // Then do NOT remove `p` .
+
+          // In other words,
+          // When `p.prev, p & p.next` are collinear,
+          // If `p.prev, p & p.next` are on the outer edge,
+          // Or `p.prev & p` are on different holes ,
+          // Then do REMOVE `p`
+          if (_area(p.prev!, p, p.next!) == 0) {
+            toRemove = true;
+          }
+        }
+      }
+
+      if (toRemove) {
         _removeNode(p);
         p = (end = p.prev)!;
         if (p == p.next) {
@@ -619,6 +657,9 @@ abstract final class Earcut {
     final b2 = _Node(b.i, b.x, b.y);
     final an = a.next!;
     final bp = b.prev!;
+
+    a2.holeId = a.holeId;
+    b2.holeId = b.holeId;
 
     a.next = b;
     b.prev = a;
@@ -760,23 +801,25 @@ abstract final class Earcut {
     List<double> data,
     int start,
     int end,
-    int dim, {
+    int dim,
+    int? holeId, {
     required bool clockwise,
   }) {
     _Node? last;
     if (clockwise == (_signedArea(data, start, end, dim) > 0)) {
       for (int i = start; i < end; i += dim) {
-        last = _insertNode(i, data[i], data[i + 1], last);
+        last = _insertNode(i, data[i], data[i + 1], last)..holeId = holeId;
       }
     } else {
       for (int i = end - dim; i >= start; i -= dim) {
-        last = _insertNode(i, data[i], data[i + 1], last);
+        last = _insertNode(i, data[i], data[i + 1], last)..holeId = holeId;
       }
     }
 
     if (last != null && _equals(last, last.next!)) {
       _removeNode(last);
       last = last.next;
+      last?.holeId = holeId;
     }
 
     return last;
@@ -829,6 +872,7 @@ final class _Node {
   _Node? next;
   _Node? prevZ;
   _Node? nextZ;
+  int? holeId;
 
   _Node(this.i, this.x, this.y)
       : z = 4.9E-324,

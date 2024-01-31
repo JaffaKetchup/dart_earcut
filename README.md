@@ -1,6 +1,6 @@
 # dart_earcut
 
-Ear-clipping (earcutting) triangulation algorithm, ported (with minor API differences) from [earcut4j/earcut4j](https://github.com/earcut4j/earcut4j) and [mapbox/earcut](https://github.com/mapbox/earcut).
+Ear-clipping (earcutting) triangulation algorithm, ported (with minor API differences) from [earcut4j/earcut4j](https://github.com/earcut4j/earcut4j) and [mapbox/earcut](https://github.com/mapbox/earcut). Also includes the fix from [mapbox/earcut#91](https://github.com/mapbox/earcut/pull/91).
 
 ## Usage
 
