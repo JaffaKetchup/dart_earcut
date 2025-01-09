@@ -22,6 +22,8 @@ Ear-clipping (earcutting) triangulation algorithm, ported (with minor API differ
   // Returns [3,0,4, 5,4,0, 3,4,7, 5,0,1, 2,3,7, 6,5,1, 2,7,6, 6,1,2]
   ```
 
+  * `triangulateFromPointsAndHolePoints` performs the logic to generate `holeIndices` when the outline of a polygon and the outline of its holes are available as points seperately.
+
 * More dimensions  
   Expected to be in the format `[x0, y0, z0, x1, y1, z1, x2, y2, z2, ...]`
 

@@ -1,3 +1,4 @@
+// Ported code makes extensive use of this technique
 // ignore_for_file: parameter_assignments
 
 import 'dart:math';
@@ -6,22 +7,62 @@ import 'dart:math';
 /// [earcut4j/earcut4j](https://github.com/earcut4j/earcut4j) and
 /// [mapbox/earcut](https://github.com/mapbox/earcut).
 abstract final class Earcut {
-  /// Triangulates the given polygon
+  /// Triangulates the 2D polygon formed from the [outline] & [holes]
   ///
-  /// [polygonVertices] should be a list of all the [Point]s defining
-  /// the polygon.
+  /// [outline] should be a list of all the [Point]s defining the outline of the
+  /// polygon.
   ///
-  /// [holeIndices] should be a list of hole indicies, if any. For example,
+  /// [holes] should be a list of outlines of holes in the polygon.
+  ///
+  /// If more control is needed, see [triangulateRaw].
+  ///
+  /// Returns a list of vertice indices where a group of 3 forms a triangle.
+  static List<int> triangulateFromPointsAndHolePoints({
+    required Iterable<Point<double>> outline,
+    required Iterable<Iterable<Point<double>>> holes,
+  }) {
+    if (holes.isEmpty) return triangulateFromPoints(outline);
+
+    Iterable<int> generateHolesIndices() sync* {
+      var prevValue = outline.length;
+      yield prevValue;
+
+      for (int i = 0; i < holes.length - 1; i++) {
+        yield prevValue += holes.elementAt(i).length;
+      }
+    }
+
+    return triangulateFromPoints(
+      outline.followedBy(holes.expand((e) => e)),
+      holeIndices: generateHolesIndices().toList(growable: false),
+    );
+  }
+
+  /// Triangulates a 2D polygon
+  ///
+  /// [polygonVertices] should be a list of all the [Point]s defining the
+  /// polygon, including any holes.
+  ///
+  /// [holeIndices] should be a list of hole indices, if any. For example,
   /// `[5, 8]` for a 12-vertice input would mean one hole with vertices 5-7 and
   /// another with 8-11.
   ///
-  /// Returns a list of vertice indicies where a group of 3 forms a triangle.
+  /// See [triangulateFromPointsAndHolePoints] which may be easier to use in
+  /// many cases. If more control is needed, see [triangulateRaw].
+  ///
+  /// Returns a list of vertice indices where a group of 3 forms a triangle.
   static List<int> triangulateFromPoints(
     Iterable<Point<double>> polygonVertices, {
     List<int>? holeIndices,
   }) =>
       triangulateRaw(
-        polygonVertices.map((e) => [e.x, e.y]).expand((e) => e).toList(),
+        List.generate(
+          polygonVertices.length * 2,
+          (i) => i.isEven
+              ? polygonVertices.elementAt(i ~/ 2).x
+              : polygonVertices.elementAt(i ~/ 2).y,
+          growable: false,
+        ),
         holeIndices: holeIndices,
       );
 
@@ -32,11 +73,11 @@ abstract final class Earcut {
   /// `[x0, y0, x1, y1, x2, y2, ...]`. If [dimensions] is 3, it is expected to
   /// be in the format `[x0, y0, z0, x1, y1, z1, x2, y2, z2, ...]`.
   ///
-  /// [holeIndices] should be a list of hole indicies, if any. For example,
+  /// [holeIndices] should be a list of hole Indices, if any. For example,
   /// `[5, 8]` for a 12-vertice input would mean one hole with vertices 5-7 and
   /// another with 8-11.
   ///
-  /// Returns a list of vertice indicies where a group of 3 forms a triangle.
+  /// Returns a list of vertice indices where a group of 3 forms a triangle.
   static List<int> triangulateRaw(
     List<double> polygonVertices, {
     List<int>? holeIndices,
@@ -142,9 +183,9 @@ abstract final class Earcut {
           : _isEar(ear)) {
         // cut off the triangle
         triangles
-          ..add(prev!.i ~/ dim)
+          ..add(prev.i ~/ dim)
           ..add(ear.i ~/ dim)
-          ..add(next!.i ~/ dim);
+          ..add(next.i ~/ dim);
 
         _removeNode(ear);
 
@@ -185,7 +226,7 @@ abstract final class Earcut {
           // as a last resort, try splitting the remaining polygon
           // into two
         } else if (pass == 2) {
-          _splitEarcut(ear!, triangles, dim, minX, minY, invSize);
+          _splitEarcut(ear, triangles, dim, minX, minY, invSize);
         }
 
         break;
@@ -204,7 +245,7 @@ abstract final class Earcut {
     // look for a valid diagonal that divides the polygon into two
     _Node a = start;
     do {
-      _Node? b = a.next!.next;
+      _Node? b = a.next.next;
       while (b != a.prev) {
         if (a.i != b!.i && _isValidDiagonal(a, b)) {
           // split the polygon in two by the diagonal
@@ -221,23 +262,23 @@ abstract final class Earcut {
         }
         b = b.next;
       }
-      a = a.next!;
+      a = a.next;
     } while (a != start);
   }
 
   static bool _isValidDiagonal(_Node a, _Node b) =>
-      a.next!.i != b.i &&
-      a.prev!.i != b.i &&
+      a.next.i != b.i &&
+      a.prev.i != b.i &&
       !_intersectsPolygon(a, b) && // dones't intersect other edges
       (_locallyInside(a, b) &&
               _locallyInside(b, a) &&
               _middleInside(a, b) && // locally visible
-              (_area(a.prev!, a, b.prev!) != 0 ||
-                  _area(a, b.prev!, b) !=
+              (_area(a.prev, a, b.prev) != 0 ||
+                  _area(a, b.prev, b) !=
                       0) || // does not create opposite-facing sectors
           _equals(a, b) &&
-              _area(a.prev!, a, a.next!) > 0 &&
-              _area(b.prev!, b, b.next!) > 0); // special zero-length case
+              _area(a.prev, a, a.next) > 0 &&
+              _area(b.prev, b, b.next) > 0); // special zero-length case
 
   static bool _middleInside(_Node a, _Node b) {
     _Node p = a;
@@ -245,11 +286,11 @@ abstract final class Earcut {
     final px = (a.x + b.x) / 2;
     final py = (a.y + b.y) / 2;
     do {
-      if (((p.y > py) != (p.next!.y > py)) &&
-          (px < (p.next!.x - p.x) * (py - p.y) / (p.next!.y - p.y) + p.x)) {
+      if (((p.y > py) != (p.next.y > py)) &&
+          (px < (p.next.x - p.x) * (py - p.y) / (p.next.y - p.y) + p.x)) {
         inside = !inside;
       }
-      p = p.next!;
+      p = p.next;
     } while (p != a);
 
     return inside;
@@ -259,13 +300,13 @@ abstract final class Earcut {
     _Node p = a;
     do {
       if (p.i != a.i &&
-          p.next!.i != a.i &&
+          p.next.i != a.i &&
           p.i != b.i &&
-          p.next!.i != b.i &&
+          p.next.i != b.i &&
           _intersects(p, p.next, a, b)) {
         return true;
       }
-      p = p.next!;
+      p = p.next;
     } while (p != a);
 
     return false;
@@ -321,11 +362,11 @@ abstract final class Earcut {
   ) {
     _Node p = start;
     do {
-      final _Node? a = p.prev;
-      final b = p.next!.next;
+      final _Node a = p.prev;
+      final b = p.next.next;
 
-      if (!_equals(a!, b!) &&
-          _intersects(a, p, p.next!, b) &&
+      if (!_equals(a, b) &&
+          _intersects(a, p, p.next, b) &&
           _locallyInside(a, b) &&
           _locallyInside(b, a)) {
         triangles
@@ -335,11 +376,11 @@ abstract final class Earcut {
 
         // remove two nodes involved
         _removeNode(p);
-        _removeNode(p.next!);
+        _removeNode(p.next);
 
         p = start = b;
       }
-      p = p.next!;
+      p = p.next;
     } while (p != start);
 
     return _filterPoints(p, null);
@@ -350,16 +391,16 @@ abstract final class Earcut {
     final b = ear;
     final c = ear.next;
 
-    if (_area(a!, b, c!) >= 0) {
+    if (_area(a, b, c) >= 0) {
       return false; // reflex, can't be an ear
     }
 
     // now make sure we don't have other points inside the potential ear
-    _Node? p = ear.next!.next;
+    _Node? p = ear.next.next;
 
     while (p != ear.prev) {
       if (_pointInTriangle(a.x, a.y, b.x, b.y, c.x, c.y, p!.x, p.y) &&
-          _area(p.prev!, p, p.next!) >= 0) {
+          _area(p.prev, p, p.next) >= 0) {
         return false;
       }
       p = p.next;
@@ -374,9 +415,9 @@ abstract final class Earcut {
     double minY,
     double invSize,
   ) {
-    final a = ear.prev!;
+    final a = ear.prev;
     final b = ear;
-    final c = ear.next!;
+    final c = ear.next;
 
     if (_area(a, b, c) >= 0) {
       return false; // reflex, can't be an ear
@@ -401,13 +442,17 @@ abstract final class Earcut {
       if (p != ear.prev &&
           p != ear.next &&
           _pointInTriangle(a.x, a.y, b.x, b.y, c.x, c.y, p.x, p.y) &&
-          _area(p.prev!, p, p.next!) >= 0) return false;
+          _area(p.prev, p, p.next) >= 0) {
+        return false;
+      }
       p = p.prevZ;
 
       if (n != ear.prev &&
           n != ear.next &&
           _pointInTriangle(a.x, a.y, b.x, b.y, c.x, c.y, n.x, n.y) &&
-          _area(n.prev!, n, n.next!) >= 0) return false;
+          _area(n.prev, n, n.next) >= 0) {
+        return false;
+      }
       n = n.nextZ;
     }
 
@@ -416,7 +461,9 @@ abstract final class Earcut {
       if (p != ear.prev &&
           p != ear.next &&
           _pointInTriangle(a.x, a.y, b.x, b.y, c.x, c.y, p.x, p.y) &&
-          _area(p.prev!, p, p.next!) >= 0) return false;
+          _area(p.prev, p, p.next) >= 0) {
+        return false;
+      }
       p = p.prevZ;
     }
 
@@ -425,7 +472,9 @@ abstract final class Earcut {
       if (n != ear.prev &&
           n != ear.next &&
           _pointInTriangle(a.x, a.y, b.x, b.y, c.x, c.y, n.x, n.y) &&
-          _area(n.prev!, n, n.next!) >= 0) return false;
+          _area(n.prev, n, n.next) >= 0) {
+        return false;
+      }
       n = n.nextZ;
     }
 
@@ -471,7 +520,7 @@ abstract final class Earcut {
       p
         ..prevZ = p.prev
         ..nextZ = p.next;
-      p = p.next!;
+      p = p.next;
     } while (p != start);
 
     p.prevZ!.nextZ = null;
@@ -592,14 +641,14 @@ abstract final class Earcut {
     do {
       again = false;
 
-      final prevHole = p.prev!.holeId;
+      final prevHole = p.prev.holeId;
       final currentHole = p.holeId;
-      final nextHole = p.next!.holeId;
+      final nextHole = p.next.holeId;
 
       var toRemove = false;
 
       if (!p.steiner) {
-        if (_equals(p, p.next!) || _equals(p.prev!, p)) {
+        if (_equals(p, p.next) || _equals(p.prev, p)) {
           toRemove = true;
         } else if ((prevHole != null || prevHole != 0) ||
             (nextHole != null || nextHole != 0) ||
@@ -615,7 +664,7 @@ abstract final class Earcut {
           // If `p.prev, p & p.next` are on the outer edge,
           // Or `p.prev & p` are on different holes ,
           // Then do REMOVE `p`
-          if (_area(p.prev!, p, p.next!) == 0) {
+          if (_area(p.prev, p, p.next) == 0) {
             toRemove = true;
           }
         }
@@ -623,13 +672,13 @@ abstract final class Earcut {
 
       if (toRemove) {
         _removeNode(p);
-        p = (end = p.prev)!;
+        p = end = p.prev;
         if (p == p.next) {
           break;
         }
         again = true;
       } else {
-        p = p.next!;
+        p = p.next;
       }
     } while (again || p != end);
 
@@ -655,8 +704,8 @@ abstract final class Earcut {
   static _Node _splitPolygon(_Node a, _Node b) {
     final a2 = _Node(a.i, a.x, a.y);
     final b2 = _Node(b.i, b.x, b.y);
-    final an = a.next!;
-    final bp = b.prev!;
+    final an = a.next;
+    final bp = b.prev;
 
     a2.holeId = a.holeId;
     b2.holeId = b.holeId;
@@ -689,23 +738,22 @@ abstract final class Earcut {
     // the left;
     // segment's endpoint with lesser x will be potential connection point
     do {
-      if (hy <= p.y && hy >= p.next!.y) {
-        final double x =
-            p.x + (hy - p.y) * (p.next!.x - p.x) / (p.next!.y - p.y);
+      if (hy <= p.y && hy >= p.next.y) {
+        final double x = p.x + (hy - p.y) * (p.next.x - p.x) / (p.next.y - p.y);
         if (x <= hx && x > qx) {
           qx = x;
           if (x == hx) {
             if (hy == p.y) {
               return p;
             }
-            if (hy == p.next!.y) {
+            if (hy == p.next.y) {
               return p.next;
             }
           }
-          m = p.x < p.next!.x ? p : p.next;
+          m = p.x < p.next.x ? p : p.next;
         }
       }
-      p = p.next!;
+      p = p.next;
     } while (p != outerNode);
 
     if (m == null) {
@@ -755,21 +803,20 @@ abstract final class Earcut {
         }
       }
 
-      p = p.next!;
+      p = p.next;
     } while (p != stop);
 
     return m;
   }
 
-  static bool _locallyInside(_Node a, _Node? b) =>
-      _area(a.prev!, a, a.next!) < 0
-          ? _area(a, b!, a.next!) >= 0 && _area(a, a.prev!, b) >= 0
-          : _area(a, b!, a.prev!) < 0 || _area(a, a.next!, b) < 0;
+  static bool _locallyInside(_Node a, _Node? b) => _area(a.prev, a, a.next) < 0
+      ? _area(a, b!, a.next) >= 0 && _area(a, a.prev, b) >= 0
+      : _area(a, b!, a.prev) < 0 || _area(a, a.next, b) < 0;
 
   // whether sector in vertex m contains sector in vertex p in the same
   // coordinates
   static bool _sectorContainsSector(_Node m, _Node p) =>
-      _area(m.prev!, m, p.prev!) < 0 && _area(p.next!, m, m.next!) < 0;
+      _area(m.prev, m, p.prev) < 0 && _area(p.next, m, m.next) < 0;
 
   static bool _pointInTriangle(
     double ax,
@@ -792,7 +839,7 @@ abstract final class Earcut {
       if (p.x < leftmost.x || (p.x == leftmost.x && p.y < leftmost.y)) {
         leftmost = p;
       }
-      p = p.next!;
+      p = p.next;
     } while (p != start);
     return leftmost;
   }
@@ -816,18 +863,17 @@ abstract final class Earcut {
       }
     }
 
-    if (last != null && _equals(last, last.next!)) {
+    if (last != null && _equals(last, last.next)) {
       _removeNode(last);
-      last = last.next;
-      last?.holeId = holeId;
+      last = last.next..holeId = holeId;
     }
 
     return last;
   }
 
   static void _removeNode(_Node p) {
-    p.next!.prev = p.prev;
-    p.prev!.next = p.next;
+    p.next.prev = p.prev;
+    p.prev.next = p.next;
 
     p.prevZ?.nextZ = p.nextZ;
 
@@ -845,7 +891,7 @@ abstract final class Earcut {
       p
         ..next = last.next
         ..prev = last;
-      last.next!.prev = p;
+      last.next.prev = p;
       last.next = p;
     }
     return p;
@@ -863,18 +909,20 @@ abstract final class Earcut {
 }
 
 final class _Node {
-  int i;
-  double x;
-  double y;
-  double z;
-  bool steiner;
-  _Node? prev;
-  _Node? next;
-  _Node? prevZ;
-  _Node? nextZ;
-  int? holeId;
-
   _Node(this.i, this.x, this.y)
       : z = 4.9E-324,
         steiner = false;
+
+  final int i;
+  final double x;
+  final double y;
+
+  late _Node prev;
+  late _Node next;
+
+  double z;
+  bool steiner;
+  _Node? prevZ;
+  _Node? nextZ;
+  int? holeId;
 }

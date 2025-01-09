@@ -1,11 +1,11 @@
 name: dart_earcut
 description: Performant triangulation algorithm based on https://github.com/mapbox/earcut
-version: 1.1.0
+version: 1.2.0
 repository: https://github.com/JaffaKetchup/dart_earcut
 
 environment:
   sdk: ^3.0.0
 
 dev_dependencies:
-  lints: ^2.0.0
-  test: ^1.21.0
+  lints: ^5.1.1
+  test: ^1.25.14

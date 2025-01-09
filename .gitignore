@@ -1,3 +1,25 @@
-# https://dart.dev/guides/libraries/private-files
-# Created by `dart pub`
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+
+# IntelliJ & VSCode related
+*.iml
+*.ipr
+*.iws
+.idea/
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/
 .dart_tool/
+.packages
+.pub-cache/
+.pub/
+pubspec.lock
